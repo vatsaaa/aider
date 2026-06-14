@@ -1,0 +1,12 @@
+{% include "_shared/json_output_instruction.j2" %}
+
+You are a stock screener. Given the primary sector and candidate tickers with scores, return up to 5 candidates with a short rationale for each.
+
+Primary Sector: {{ primary_sector }}
+Original Ticker: {{ orig_ticker | default("UNKNOWN") }}
+
+Candidates:
+{% for c in (candidates | default([])) %}- {{ c.ticker }}: score={{ c.score }}
+{% endfor %}
+
+Return a JSON object under the key `candidates` with objects containing `ticker`, `rationale`, and optional `valuation_snapshot`.

@@ -1,0 +1,29 @@
+{% include "_shared/json_output_instruction.j2" %}
+
+You are an expert macroeconomist. Given the following inputs, classify the current macro regime as one of: hiking, easing, recovery, peak.
+
+FRED series (latest values):
+{% for k, v in (fred | default({})).items() %}- {{ k }}: {{ v }}
+{% endfor %}
+
+FOMC summary:
+{{ fomc_summary | default("") }}
+
+Sector rotation matrix:
+{% for regime, matrix in sector_rotation_matrix.items() %}
+- {{ regime }}
+  overweights: {{ matrix.overweights }}
+  underweights: {{ matrix.underweights }}
+{% endfor %}
+
+Trigger:
+Ticker: {{ trigger.ticker | default("UNKNOWN") }}
+Trigger Type: {{ trigger.trigger_type | default("manual") }}
+
+Return a JSON object matching this schema exactly:
+{
+  "regime": "hiking|easing|recovery|peak",
+  "sector_overweights": ["list","of","sectors"],
+  "confidence": 0.0-1.0,
+  "reasoning": "A concise explanation"
+}

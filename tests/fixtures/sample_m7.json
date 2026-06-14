@@ -1,0 +1,8 @@
+{
+  "rating": "BUY",
+  "target_price": 212.34,
+  "dcf_value": 205.0,
+  "peer_multiple_value": 219.68,
+  "model_id": "model-1",
+  "reasoning": "The DCF and peer work both point to upside with enough margin for a BUY."
+}

@@ -1,0 +1,30 @@
+triggers:
+  - type: "8-K"
+    description: "SEC 8-K material event filing"
+    priority: high
+    sector_filter: all
+
+  - type: "10-Q"
+    description: "SEC quarterly report"
+    priority: medium
+    sector_filter: all
+
+  - type: "10-K"
+    description: "SEC annual report"
+    priority: medium
+    sector_filter: all
+
+  - type: "earnings"
+    description: "Earnings call T-24hr pre-announcement"
+    priority: high
+    sector_filter: all
+
+  - type: "fred_release"
+    description: "FRED macro data release (CPI, PCE, FOMC)"
+    priority: high
+    sector_filter: all
+
+  - type: "manual"
+    description: "Analyst-initiated run"
+    priority: high
+    sector_filter: all

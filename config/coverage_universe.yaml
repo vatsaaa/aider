@@ -1,0 +1,200 @@
+- ticker: AAPL
+  sector: Technology
+  peers: [MSFT, NVDA, GOOGL, META]
+  price_trigger_pct: 5.0
+- ticker: MSFT
+  sector: Technology
+  peers: [AAPL, NVDA, GOOGL, META]
+  price_trigger_pct: 5.0
+- ticker: NVDA
+  sector: Technology
+  peers: [AAPL, MSFT, GOOGL, AMD]
+  price_trigger_pct: 6.0
+- ticker: GOOGL
+  sector: Technology
+  peers: [AAPL, MSFT, META, AMZN]
+  price_trigger_pct: 5.0
+- ticker: META
+  sector: Technology
+  peers: [AAPL, MSFT, GOOGL, AMZN]
+  price_trigger_pct: 6.0
+- ticker: AMD
+  sector: Technology
+  peers: [NVDA, INTC, QCOM, AVGO]
+  price_trigger_pct: 7.0
+- ticker: INTC
+  sector: Technology
+  peers: [AMD, NVDA, QCOM, AVGO]
+  price_trigger_pct: 7.0
+- ticker: QCOM
+  sector: Technology
+  peers: [AMD, INTC, AVGO, TXN]
+  price_trigger_pct: 5.5
+- ticker: AVGO
+  sector: Technology
+  peers: [AMD, QCOM, TXN, ORCL]
+  price_trigger_pct: 5.5
+- ticker: ORCL
+  sector: Technology
+  peers: [MSFT, AAPL, CRM, SAP]
+  price_trigger_pct: 5.0
+- ticker: JPM
+  sector: Banking
+  peers: [BAC, WFC, GS, C]
+  price_trigger_pct: 4.0
+- ticker: BAC
+  sector: Banking
+  peers: [JPM, WFC, GS, C]
+  price_trigger_pct: 4.0
+- ticker: WFC
+  sector: Banking
+  peers: [JPM, BAC, GS, C]
+  price_trigger_pct: 4.0
+- ticker: GS
+  sector: Banking
+  peers: [JPM, BAC, WFC, MS]
+  price_trigger_pct: 4.5
+- ticker: C
+  sector: Banking
+  peers: [JPM, BAC, WFC, GS]
+  price_trigger_pct: 4.5
+- ticker: MS
+  sector: Banking
+  peers: [JPM, GS, C, BAC]
+  price_trigger_pct: 4.5
+- ticker: USB
+  sector: Banking
+  peers: [JPM, BAC, WFC, PNC]
+  price_trigger_pct: 4.0
+- ticker: PNC
+  sector: Banking
+  peers: [USB, C, JPM, BAC]
+  price_trigger_pct: 4.0
+- ticker: XOM
+  sector: Energy
+  peers: [CVX, COP, SLB, OXY]
+  price_trigger_pct: 5.0
+- ticker: CVX
+  sector: Energy
+  peers: [XOM, COP, OXY, SLB]
+  price_trigger_pct: 5.0
+- ticker: COP
+  sector: Energy
+  peers: [XOM, CVX, OXY, SLB]
+  price_trigger_pct: 5.5
+- ticker: SLB
+  sector: Energy
+  peers: [XOM, CVX, HAL, COP]
+  price_trigger_pct: 6.0
+- ticker: HAL
+  sector: Energy
+  peers: [SLB, COP, OXY, XOM]
+  price_trigger_pct: 6.0
+- ticker: OXY
+  sector: Energy
+  peers: [XOM, CVX, COP, SLB]
+  price_trigger_pct: 5.5
+- ticker: EOG
+  sector: Energy
+  peers: [XOM, CVX, COP, OXY]
+  price_trigger_pct: 5.5
+- ticker: LLY
+  sector: Healthcare
+  peers: [JNJ, MRK, PFE, ABBV]
+  price_trigger_pct: 5.0
+- ticker: JNJ
+  sector: Healthcare
+  peers: [LLY, MRK, PFE, ABBV]
+  price_trigger_pct: 4.5
+- ticker: MRK
+  sector: Healthcare
+  peers: [LLY, JNJ, PFE, ABBV]
+  price_trigger_pct: 5.0
+- ticker: PFE
+  sector: Healthcare
+  peers: [LLY, JNJ, MRK, ABBV]
+  price_trigger_pct: 5.5
+- ticker: ABBV
+  sector: Healthcare
+  peers: [LLY, JNJ, MRK, PFE]
+  price_trigger_pct: 5.0
+- ticker: UNH
+  sector: Healthcare
+  peers: [LLY, JNJ, MRK, PFE]
+  price_trigger_pct: 4.5
+- ticker: DHR
+  sector: Healthcare
+  peers: [LLY, JNJ, ABBV, UNH]
+  price_trigger_pct: 5.0
+- ticker: WMT
+  sector: Retail/Consumer
+  peers: [TGT, COST, AMZN, HD]
+  price_trigger_pct: 4.5
+- ticker: TGT
+  sector: Retail/Consumer
+  peers: [WMT, COST, AMZN, HD]
+  price_trigger_pct: 5.0
+- ticker: COST
+  sector: Retail/Consumer
+  peers: [WMT, TGT, AMZN, HD]
+  price_trigger_pct: 5.0
+- ticker: AMZN
+  sector: Retail/Consumer
+  peers: [WMT, TGT, COST, HD]
+  price_trigger_pct: 6.0
+- ticker: HD
+  sector: Retail/Consumer
+  peers: [WMT, TGT, COST, AMZN]
+  price_trigger_pct: 5.0
+- ticker: LOW
+  sector: Retail/Consumer
+  peers: [WMT, TGT, COST, HD]
+  price_trigger_pct: 5.0
+- ticker: MCD
+  sector: Retail/Consumer
+  peers: [WMT, COST, AMZN, HD]
+  price_trigger_pct: 4.5
+- ticker: CAT
+  sector: Industrials
+  peers: [DE, HON, UPS, BA]
+  price_trigger_pct: 5.0
+- ticker: DE
+  sector: Industrials
+  peers: [CAT, HON, UPS, BA]
+  price_trigger_pct: 5.0
+- ticker: HON
+  sector: Industrials
+  peers: [CAT, DE, UPS, BA]
+  price_trigger_pct: 4.5
+- ticker: UPS
+  sector: Industrials
+  peers: [CAT, DE, HON, BA]
+  price_trigger_pct: 5.0
+- ticker: BA
+  sector: Industrials
+  peers: [CAT, DE, HON, UPS]
+  price_trigger_pct: 6.0
+- ticker: GE
+  sector: Industrials
+  peers: [CAT, DE, HON, UPS]
+  price_trigger_pct: 5.0
+- ticker: PLD
+  sector: REIT
+  peers: [AMT, EQIX, SPG, O]
+  price_trigger_pct: 4.0
+- ticker: AMT
+  sector: REIT
+  peers: [PLD, EQIX, SPG, O]
+  price_trigger_pct: 4.0
+- ticker: EQIX
+  sector: REIT
+  peers: [PLD, AMT, SPG, O]
+  price_trigger_pct: 4.5
+- ticker: SPG
+  sector: REIT
+  peers: [PLD, AMT, EQIX, O]
+  price_trigger_pct: 4.5
+- ticker: O
+  sector: REIT
+  peers: [PLD, AMT, EQIX, SPG]
+  price_trigger_pct: 4.0

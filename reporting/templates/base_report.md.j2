@@ -1,0 +1,53 @@
+"""Jinja2 template for PM1 draft equity research reports.
+
+This template defines the report structure that PM1 fills after thesis
+generation. The section order matches the WBS so downstream PDF rendering and
+review tooling can rely on stable headings.
+"""
+
+# {{ ticker }} — {{ rating }} | Target: ${{ "%.2f" | format(target_price) }} | {{ date }}
+
+## Investment Thesis (Page 1)
+{{ investment_thesis }}
+
+## Financial Summary Table
+| Metric | FY-1 | FY0 | FY+1 | FY+2 |
+| --- | ---: | ---: | ---: | ---: |
+{% for row in financial_summary_rows -%}
+| {{ row.metric }} | {{ row.fy_minus_1 }} | {{ row.fy_0 }} | {{ row.fy_1 }} | {{ row.fy_2 }} |
+{% endfor %}
+
+## Business Model & Competitive Position
+{{ business_model }}
+
+## Earnings Review: Actual vs. Consensus
+{{ earnings_review }}
+
+## Three-Scenario Financial Model (Bear / Base / Bull)
+### Bear
+{{ scenarios.bear }}
+
+### Base
+{{ scenarios.base }}
+
+### Bull
+{{ scenarios.bull }}
+
+## WACC / Terminal Growth Sensitivity Table
+| WACC \ Growth | {% for growth in sensitivity_growth_rates %}{{ growth }}{% if not loop.last %} | {% endif %}{% endfor %} |
+| --- | {% for _ in sensitivity_growth_rates %}---: {% if not loop.last %}| {% endif %}{% endfor %}|
+{% for wacc_label, growth_values in sensitivity_table.items() -%}
+| {{ wacc_label }} | {% for growth_label in sensitivity_growth_rates %}{{ growth_values[growth_label] }}{% if not loop.last %} | {% endif %}{% endfor %} |
+{% endfor %}
+
+## Risk Factors
+{{ risk_factors }}
+
+## Appendix (DCF detail, peer comp table)
+### DCF Detail
+{{ dcf_detail }}
+
+### Peer Comp Table
+{{ peer_comp_table }}
+
+Pipeline run ID: {{ run_id }} | Model ID: {{ model_id }} | {{ timestamp }}

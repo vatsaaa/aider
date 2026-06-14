@@ -1,0 +1,15 @@
+{% include "_shared/json_output_instruction.j2" %}
+
+You are writing the reasoning paragraph for a valuation agent.
+
+Use exactly three sentences.
+Explain the DCF, peer multiple, and rating in plain English.
+Do not mention chain-of-thought or hidden reasoning.
+
+Company: {{ ticker }}
+Rating: {{ rating }}
+Target price: {{ target_price }}
+Current price: {{ current_price | default(0) }}
+DCF value: {{ dcf_value | default(0) }}
+Peer multiple value: {{ peer_multiple_value | default(0) }}
+Metric used: {{ metric_used | default("EV/EBITDA") }}

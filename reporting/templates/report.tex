@@ -1,0 +1,54 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage{fontspec}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+
+\newcounter{none}
+
+\definecolor{reportred}{HTML}{D40000}
+
+\IfFontExistsTF{Helvetica Neue}{
+  \setmainfont{Helvetica Neue}
+}{
+  \IfFontExistsTF{Liberation Sans}{
+    \setmainfont{Liberation Sans}
+  }{
+    \setmainfont{Latin Modern Roman}
+  }
+}
+
+\titleformat{\section}{\Large\bfseries\color{reportred}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{reportred}}{\thesubsection}{1em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.75em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[L]{9 Stages to Published Equity Research}
+\fancyfoot[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=reportred,
+  urlcolor=reportred,
+  citecolor=reportred
+}
+
+\begin{document}
+
+$body$
+
+\vspace{1.5em}
+{\small Pipeline run ID: $if(run_id)$$run_id$$endif$}
+
+\end{document}

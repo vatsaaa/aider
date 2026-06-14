@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<us-gaap:Report xmlns:us-gaap="http://fasb.org/us-gaap/2020-01-31">
+  <us-gaap:Revenues>1000000000</us-gaap:Revenues>
+  <us-gaap:NetIncomeLoss>200000000</us-gaap:NetIncomeLoss>
+  <us-gaap:Assets>3500000000</us-gaap:Assets>
+  <us-gaap:Liabilities>1200000000</us-gaap:Liabilities>
+  <Notes>
+    <Note>There is substantial doubt about the company's ability to continue as a going concern.</Note>
+  </Notes>
+</us-gaap:Report>

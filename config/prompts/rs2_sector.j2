@@ -1,0 +1,22 @@
+{% include "_shared/json_output_instruction.j2" %}
+
+You are an investment analyst. Given the macro regime and sector overweights, score the following sectors for relative opportunity on a scale from 0.0 to 1.0.
+
+Regime: {{ regime }}
+Overweights: {{ overweights | default([]) }}
+
+Sectors:
+{% for name, info in (sectors | default({})).items() %}
+- {{ name }}
+  primary_multiple: {{ info.primary_multiple }}
+  metrics:
+  {% for m in info.metrics %}- {{ m }}
+  {% endfor %}
+{% endfor %}
+
+Return a JSON object with the schema:
+{
+  "sector_scores": {"<sector>": 0.0, ...},
+  "primary_sector": "<one of the sector names>",
+  "reasoning": "brief rationale"
+}

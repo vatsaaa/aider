@@ -1,0 +1,49 @@
+default:
+  strategy: ollama_first
+  primary_provider: ollama
+  fallback_provider: anthropic
+  ollama_model: gemma4:e4b
+  claude_model: claude-sonnet-4-20250514
+
+no_llm_agents:
+  - av1
+  - av2
+  - pm2
+
+routing:
+  rs1_macro:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  rs2_sector:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  rs3_screen:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  av3_valuation:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  pm1_thesis:
+    strategy: fallback_always
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+  critic_quant:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  critic_logic:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  critic_data:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b
+  arbiter:
+    strategy: ollama_first
+    provider: ollama
+    model: gemma4:e4b

@@ -1,0 +1,39 @@
+hiking:
+  overweights:
+    - Financials
+    - Energy
+    - Industrials
+  underweights:
+    - Consumer Staples
+    - Healthcare
+    - Utilities
+
+easing:
+  overweights:
+    - Consumer Staples
+    - Healthcare
+    - Utilities
+  underweights:
+    - Financials
+    - Energy
+    - Industrials
+
+recovery:
+  overweights:
+    - Consumer Discretionary
+    - Industrials
+    - Information Technology
+  underweights:
+    - Utilities
+    - Consumer Staples
+    - Healthcare
+
+peak:
+  overweights:
+    - Energy
+    - Financials
+    - Healthcare
+  underweights:
+    - Consumer Discretionary
+    - Industrials
+    - Information Technology

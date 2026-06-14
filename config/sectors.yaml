@@ -1,0 +1,48 @@
+- name: Information Technology
+  primary_multiple: EV/EBITDA
+  metrics:
+    - revenue_growth_yoy
+    - gross_margin
+    - pe_ratio
+
+- name: Financials
+  primary_multiple: P/B
+  metrics:
+    - return_on_equity
+    - net_interest_margin
+    - leverage
+
+- name: Healthcare
+  primary_multiple: EV/EBITDA
+  metrics:
+    - r_and_d_percent_sales
+    - revenue_growth_yoy
+    - gross_margin
+
+- name: Consumer Discretionary
+  primary_multiple: PE
+  metrics:
+    - revenue_growth_yoy
+    - same_store_sales
+    - ebitda_margin
+
+- name: Consumer Staples
+  primary_multiple: PE
+  metrics:
+    - gross_margin
+    - inventory_turnover
+    - dividend_yield
+
+- name: Industrials
+  primary_multiple: EV/EBITDA
+  metrics:
+    - order_backlog
+    - revenue_growth_yoy
+    - operating_margin
+
+- name: Energy
+  primary_multiple: EV/EBITDA
+  metrics:
+    - production_volume
+    - reserves
+    - net_debt_to_ebitda
