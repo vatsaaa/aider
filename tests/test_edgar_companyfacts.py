@@ -232,6 +232,18 @@ def test_bank_revenue_tag_is_recognised() -> None:
     assert (non_bank.build_income_statement()["InterestExpense"] > 0).all()
 
 
+def test_gross_revenue_matching_older_net_figure_not_flagged() -> None:
+    """The flag follows the tag actually selected, not a value coincidence with an older net-revenue fact."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    del gaap["RevenueFromContractWithCustomerExcludingAssessedTax"]
+    gaap["RevenuesNetOfInterestExpense"] = _usd(_duration(180e9, 2024, filed="2024-11-01"))
+    gaap["Revenues"] = _usd(_duration(180e9, 2024, filed="2025-02-01"))
+
+    assert edgar.extract_financials(facts)["financials"]["revenue_net_of_interest"] is False
+
+
 def test_non_bank_revenue_not_flagged_net_of_interest() -> None:
     """Ordinary revenue tags leave AV2's interest expense in place."""
 

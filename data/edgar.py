@@ -136,7 +136,7 @@ def _days_between(start: str, end: str) -> int:
 
 
 def _annual_entries(facts: Dict[str, Any], tags: Iterable[str], unit: str, duration: bool, taxonomy: str = "us-gaap") -> list[dict[str, Any]]:
-    """Return annual-report entries across `tags`, one per period end, newest first.
+    """Return annual-report entries across `tags`, one per period end, newest first, each annotated with its `tag`.
 
     Companies switch XBRL tags over time (e.g. `Revenues` →
     `RevenueFromContractWithCustomerExcludingAssessedTax`), so every tag is
@@ -156,7 +156,7 @@ def _annual_entries(facts: Dict[str, Any], tags: Iterable[str], unit: str, durat
             if duration:
                 if not entry.get("start") or not 350 <= _days_between(entry["start"], entry["end"]) <= 380:
                     continue
-            candidates.append((entry["end"], entry.get("filed", ""), -priority, entry))
+            candidates.append((entry["end"], entry.get("filed", ""), -priority, {**entry, "tag": tag}))
     candidates.sort(key=lambda item: item[:3], reverse=True)
     by_end: dict[str, dict[str, Any]] = {}
     for end, _, _, entry in candidates:
@@ -345,10 +345,7 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
     shares = _latest(company_facts, ("EntityCommonStockSharesOutstanding",), duration=False, unit="shares", taxonomy="dei")
 
     # bank revenue is reported after interest expense; AV2 must not deduct interest a second time
-    revenue_net_of_interest = any(
-        entry["end"] == fy_end and float(entry["val"]) == revenue
-        for entry in _annual_entries(company_facts, ("RevenuesNetOfInterestExpense",), "USD", duration=True)
-    )
+    revenue_net_of_interest = revenue_history[0]["tag"] == "RevenuesNetOfInterestExpense"
 
     debt, current_debt = _debt_at(company_facts, fy_end)
     # AV2 models cash and debt separately, so working capital excludes them
