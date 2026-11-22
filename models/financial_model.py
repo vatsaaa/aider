@@ -47,6 +47,7 @@ class ProjectionInputs:
     market_beta: float
     risk_free_rate: float
     erp: float
+    revenue_net_of_interest: bool = False
 
 
 def _load_yaml_file(path: Path) -> dict[str, Any]:
@@ -358,6 +359,7 @@ class ThreeStatementModel:
             market_beta=market_beta,
             risk_free_rate=risk_free_rate,
             erp=erp,
+            revenue_net_of_interest=bool(financials.get("revenue_net_of_interest", False)),
         )
 
     def _validate_opening_balance(self) -> bool:
@@ -439,7 +441,10 @@ class ThreeStatementModel:
             da = revenue * self.inputs.da_pct
             ebitda = gross_profit - opex
             ebit = ebitda - da
-            interest_expense = max(prior_debt, self.inputs.debt) * self.inputs.interest_rate * 0.5
+            if self.inputs.revenue_net_of_interest:
+                interest_expense = 0.0
+            else:
+                interest_expense = max(prior_debt, self.inputs.debt) * self.inputs.interest_rate * 0.5
             pre_tax_income = ebit - interest_expense
             tax_expense = max(pre_tax_income, 0.0) * self.inputs.tax_rate
             net_income = pre_tax_income - tax_expense

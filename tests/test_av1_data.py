@@ -1,13 +1,17 @@
 import json
 from pathlib import Path
 import sqlite3
+
+import pytest
 from sqlalchemy import text
 from data import edgar
 from core import auditor_flags
 
 from agents.av1_data import AV1DataAgent
 from core.bus import InMemoryBus, Message
+from core.exceptions import FatalError
 from core.schemas import M4ScreenOutput
+from tests.test_edgar_companyfacts import sample_company_facts
 
 
 def test_parse_xbrl_fixture():
@@ -48,10 +52,14 @@ def test_agent_persists_and_publishes(monkeypatch):
     # Monkeypatch edgar.fetch_filings to return our fixture and parse_xbrl_file to use it
     fixture = Path("tests/fixtures/aapl_10k_excerpt.xml").resolve()
 
-    def fake_fetch(ticker, filing_types=None, count=4):
+    def fake_fetch(ticker, filing_types=None, count=4, **kwargs):
         return [str(fixture)]
 
+    def fake_financials(ticker, user_agent, session=None):
+        return edgar.extract_financials(sample_company_facts())
+
     monkeypatch.setattr(edgar, "fetch_filings", fake_fetch)
+    monkeypatch.setattr(edgar, "fetch_company_financials", fake_financials)
 
     # Create a simple M4 payload
     m4 = M4ScreenOutput.model_validate({
@@ -85,8 +93,65 @@ def test_agent_persists_and_publishes(monkeypatch):
         dp = json.loads(rows[0][2])
         assert dp["ticker"] == "AAPL"
         assert "filings" in dp
+        assert dp["financials"]["historical_revenue"] == 391e9
+        assert dp["opening_balance_sheet"] == {"assets": 365e9, "liabilities": 308e9, "equity": 57e9}
+        assert dp["data_quality"]["source"] == "sec_companyfacts"
 
     # Ensure M5 has correct ticker and data_package_id
     assert m5.ticker == "AAPL"
     assert m5.data_package_id is not None
     assert m5_retry.data_package_id == m5.data_package_id
+
+
+def _m4_message() -> Message:
+    """Build an RS3 output message for AAPL."""
+
+    m4 = M4ScreenOutput.model_validate({"candidates": [{"ticker": "AAPL", "rationale": "example"}]})
+    return Message(
+        id="1",
+        stream="stage:rs3:output",
+        data={"pipeline_run_id": "run-2"},
+        pipeline_run_id="run-2",
+        ticker="AAPL",
+        trigger_type="manual",
+        timestamp=None,
+        payload=m4.model_dump(),
+        metadata={},
+    )
+
+
+def test_missing_sec_financials_is_fatal(monkeypatch):
+    """AV1 no longer publishes an empty data package when SEC data is unavailable."""
+
+    agent, bus, engine = make_agent(None)
+
+    def failing_financials(ticker, user_agent, session=None):
+        raise edgar.EdgarError("SEC request failed")
+
+    monkeypatch.setattr(edgar, "fetch_company_financials", failing_financials)
+
+    with pytest.raises(FatalError) as excinfo:
+        agent.process(_m4_message())
+    assert excinfo.value.reason == "sec_financials_unavailable"
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT COUNT(*) FROM data_packages")).scalar() == 0
+
+
+def test_filing_download_failure_is_recorded(monkeypatch):
+    """A failed raw-filing download is recorded as a data-quality warning, not hidden."""
+
+    agent, bus, engine = make_agent(None)
+
+    def failing_fetch(ticker, filing_types=None, count=4, **kwargs):
+        raise edgar.EdgarError("sec down")
+
+    monkeypatch.setattr(edgar, "fetch_filings", failing_fetch)
+    monkeypatch.setattr(edgar, "fetch_company_financials", lambda ticker, user_agent, session=None: edgar.extract_financials(sample_company_facts()))
+
+    agent.process(_m4_message())
+
+    with engine.begin() as conn:
+        dp = json.loads(conn.execute(text("SELECT payload FROM data_packages")).scalar())
+    warnings = dp["data_quality"]["warnings"]
+    assert any(w.startswith("filing_download_failed") for w in warnings)
+    assert "no_filing_text_scanned_for_auditor_flags" in warnings
