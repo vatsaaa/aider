@@ -1,32 +1,40 @@
-import importlib
-import os
+import sys
 
 from sqlalchemy import create_engine, text
 
 import pytest
 
 
-# Ensure required env vars for core.config before importing monitored modules
-os.environ.setdefault("ANTHROPIC_API_KEY", "test")
-os.environ.setdefault("AIDER_DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
-os.environ.setdefault("FRED_API_KEY", "test")
-os.environ.setdefault("SEC_USER_AGENT", "test-agent")
-# SMTP defaults
-os.environ.setdefault("SMTP_HOST", "localhost")
-os.environ.setdefault("SMTP_PORT", "1025")
-os.environ.setdefault("SMTP_FROM", "test@localhost")
-os.environ.setdefault("SMTP_TO", "ops@localhost")
-os.environ.setdefault("SLACK_WEBHOOK_URL", "http://localhost:9999/webhook")
-# Alert retry config
-os.environ.setdefault("ALERT_MAX_RETRIES", "3")
-os.environ.setdefault("ALERT_RETRY_BASE_SECONDS", "0")
-
-# Reload core.config to pick up env changes
-import core.config as core_config
-importlib.reload(core_config)
-
 from orchestrator.monitor import OrchestratorMonitor
+
+
+ALERT_SETTINGS = {
+    "SMTP_HOST": "localhost",
+    "SMTP_PORT": 1025,
+    "SMTP_FROM": "test@localhost",
+    "SMTP_TO": "ops@localhost",
+    "SLACK_WEBHOOK_URL": "http://localhost:9999/webhook",
+    "ALERT_MAX_RETRIES": 3,
+    "ALERT_RETRY_BASE_SECONDS": 0,
+}
+
+
+@pytest.fixture(autouse=True)
+def alert_settings(monkeypatch):
+    """Overlay alert settings on the monitor module's settings without touching process env or other tests."""
+
+    monitor_module = sys.modules[OrchestratorMonitor.__module__]
+    real_settings = monitor_module.settings
+
+    class _AlertSettings:
+        """Settings proxy returning `ALERT_SETTINGS` overrides, else the real value."""
+
+        def __getattr__(self, name):
+            if name in ALERT_SETTINGS:
+                return ALERT_SETTINGS[name]
+            return getattr(real_settings, name)
+
+    monkeypatch.setattr(monitor_module, "settings", _AlertSettings())
 
 
 @pytest.fixture()

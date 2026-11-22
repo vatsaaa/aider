@@ -44,7 +44,7 @@ jobs:
           FRED_API_KEY: dummy
           SEC_USER_AGENT: CI Runner ci@example.com
         run: |
-          pytest -q tests/unit --maxfail=1
+          pytest -q tests --ignore=tests/integration
 
   integration-tests:
     name: Integration Tests (Postgres + Redis)

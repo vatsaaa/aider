@@ -131,7 +131,7 @@ def test_dcf_terminal_value_is_60_to_80_pct_of_total(monkeypatch, tmp_path):
     assert 0.60 <= result["terminal_value_share"] <= 0.80
 
 
-def test_sensitivity_table_is_4x4(monkeypatch, tmp_path):
+def test_sensitivity_table_is_4x4(monkeypatch, tmp_path, yfinance_peer_info):
     """The sensitivity table must contain four WACC rows and four growth columns."""
 
     core_valuation, av3_model, busmod, config, db_url = _reload(monkeypatch, tmp_path)
@@ -170,22 +170,12 @@ def test_rating_sell_when_downside_exceeds_hurdle(monkeypatch, tmp_path):
     assert core_valuation.derive_rating(100.0, 80.0) == "SELL"
 
 
-def test_peer_multiple_uses_sector_appropriate_metric(monkeypatch, tmp_path):
+def test_peer_multiple_uses_sector_appropriate_metric(monkeypatch, tmp_path, yfinance_peer_info):
     """Banking names should use price-to-book rather than EV/EBITDA."""
 
     core_valuation, _, _, _, db_url = _reload(monkeypatch, tmp_path)
     _create_tables(db_url)
     _seed_data(db_url)
-
-    class DummyTicker:
-        def __init__(self, ticker):
-            self.info = {
-                "priceToBook": 1.5 if ticker == "BAC" else 1.2,
-                "enterpriseToEbitda": 8.0,
-                "forwardPE": 9.0,
-            }
-
-    monkeypatch.setattr("yfinance.Ticker", lambda ticker: DummyTicker(ticker))
 
     result = core_valuation.compute_peer_multiple(
         "JPM",

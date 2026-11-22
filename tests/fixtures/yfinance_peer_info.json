@@ -1,0 +1,4 @@
+{
+  "BAC": {"priceToBook": 1.5, "enterpriseToEbitda": 8.0, "forwardPE": 9.0},
+  "WFC": {"priceToBook": 1.2, "enterpriseToEbitda": 8.0, "forwardPE": 9.0}
+}

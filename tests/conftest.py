@@ -159,3 +159,89 @@ def sample_m7_fixture() -> dict[str, Any]:
     """Load the sample M7 valuation payload from JSON."""
 
     return json.loads((FIXTURES_DIR / "sample_m7.json").read_text(encoding="utf-8"))
+
+_PROJECT_PACKAGES = frozenset(
+    path.name
+    for path in ROOT.iterdir()
+    if path.is_dir() and path.name != "tests" and not path.name.startswith(".") and any(path.glob("*.py"))
+)
+
+
+def _is_project_module(name: str) -> bool:
+    """Return True for modules that belong to this repository (not tests or third-party code)."""
+
+    return name.split(".", 1)[0] in _PROJECT_PACKAGES
+
+
+@pytest.fixture(autouse=True)
+def _restore_project_modules() -> Any:
+    """Undo any `sys.modules` purges a test performs so later tests see the modules they imported.
+
+    Many tests delete and re-import project modules to pick up patched
+    environment variables. Without restoring them, a later test's
+    collection-time imports (e.g. `FatalError`) no longer match the classes the
+    re-imported code raises, making results depend on test order.
+    """
+
+    saved = {name: module for name, module in sys.modules.items() if _is_project_module(name)}
+    yield
+    for name in [name for name in sys.modules if _is_project_module(name) and name not in saved]:
+        del sys.modules[name]
+    sys.modules.update(saved)
+    for name, module in saved.items():
+        parent_name, _, child = name.rpartition(".")
+        parent = saved.get(parent_name)
+        if parent is not None:
+            setattr(parent, child, module)
+
+
+class NetworkAccessBlocked(OSError):
+    """Raised when a test tries to open a connection to a non-local host."""
+
+
+def _is_local_address(address: Any) -> bool:
+    """Return True for loopback / Unix-socket addresses that tests may use (local Redis, Postgres, Docker)."""
+
+    if not isinstance(address, tuple):
+        return True
+    host = str(address[0])
+    return host in {"localhost", "::1", "0.0.0.0"} or host.startswith("127.")
+
+
+@pytest.fixture(autouse=True)
+def _block_external_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail any outbound connection so tests never depend on live SEC, FRED, Yahoo or LLM services."""
+
+    import socket
+
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+
+    def guarded_connect(sock: socket.socket, address: Any) -> Any:
+        if not _is_local_address(address):
+            raise NetworkAccessBlocked(f"tests must not access the network: {address!r}")
+        return real_connect(sock, address)
+
+    def guarded_connect_ex(sock: socket.socket, address: Any) -> Any:
+        if not _is_local_address(address):
+            raise NetworkAccessBlocked(f"tests must not access the network: {address!r}")
+        return real_connect_ex(sock, address)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+
+
+@pytest.fixture
+def yfinance_peer_info(monkeypatch: pytest.MonkeyPatch) -> dict[str, dict[str, float]]:
+    """Patch `yfinance.Ticker` to serve peer `info` dicts from `tests/fixtures/yfinance_peer_info.json`."""
+
+    info_by_ticker = json.loads((FIXTURES_DIR / "yfinance_peer_info.json").read_text(encoding="utf-8"))
+
+    class FixtureTicker:
+        """Offline stand-in for `yfinance.Ticker` backed by the fixture file."""
+
+        def __init__(self, ticker: str) -> None:
+            self.info = dict(info_by_ticker.get(ticker, {}))
+
+    monkeypatch.setattr("yfinance.Ticker", FixtureTicker)
+    return info_by_ticker
