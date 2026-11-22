@@ -253,7 +253,8 @@ def _response_confidence(response: Any, response_schema: dict[str, Any] | None) 
 def _engine(settings: Any):
     """Build a SQLAlchemy engine for the configured database URL."""
 
-    return create_engine(getattr(settings, "AIDER_DATABASE_URL"), future=True)
+    database_url = getattr(settings, "AIDER_DATABASE_URL", None) or getattr(settings, "DATABASE_URL")
+    return create_engine(database_url, future=True)
 
 
 def _default_settings() -> Any:
@@ -307,21 +308,11 @@ def _call_claude(
         prompt=_combined_prompt(system_prompt, user_prompt, response_schema),
         response=result,
         confidence=confidence,
-        cost_usd=_estimate_cost_from_result(result),
+        cost_usd=float(getattr(claude, "last_cost_usd", 0.0) or 0.0),
         run_id=run_id,
     )
     logger.info("llm_call_completed", provider="anthropic", model=model, confidence=confidence)
     return result
-
-
-def _estimate_cost_from_result(result: Any) -> float:
-    """Best-effort cost estimate for a Claude response when exact usage is unavailable."""
-
-    if isinstance(result, dict):
-        token_proxy = len(json.dumps(result))
-    else:
-        token_proxy = len(str(result))
-    return float(token_proxy) * 0.0
 
 
 def _record_llm_call(

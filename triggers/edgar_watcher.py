@@ -61,7 +61,7 @@ class EdgarWatcher:
         """
 
         events: list[M1TriggerEvent] = []
-        covered_tickers = list_coverage_tickers(self.db)
+        covered_tickers = {t.upper() for t in list_coverage_tickers(self.db)}
         seen_accessions: set[str] = set()
 
         for index, form_type in enumerate(("8-K", "10-Q", "10-K")):
@@ -81,7 +81,7 @@ class EdgarWatcher:
                 seen_accessions.add(entry.accession_number)
 
                 ticker = (entry.ticker or "").upper()
-                if not ticker or not self._is_covered(ticker):
+                if not ticker or ticker not in covered_tickers:
                     continue
                 if self._already_triggered(entry.accession_number):
                     continue

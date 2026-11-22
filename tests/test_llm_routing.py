@@ -280,3 +280,30 @@ def test_ollama_unavailable_escalates_to_claude(tmp_path, monkeypatch):
 
     assert claude_called["value"] is True
     assert result["regime"] == "neutral"
+
+def test_routed_claude_call_records_actual_cost(tmp_path, monkeypatch):
+    """Routed Claude calls must log their token-based cost so the spend limit can see it."""
+
+    db_url = f"sqlite:///{tmp_path / 'router.db'}"
+    _prepare_llm_ledger(db_url)
+
+    class FakeAnthropic:
+        def __init__(self, *args, **kwargs):
+            self.messages = SimpleNamespace(create=lambda **_: SimpleNamespace(
+                content=[SimpleNamespace(text='{"response": "ok"}')],
+                usage=SimpleNamespace(input_tokens=1_000_000, output_tokens=0),
+            ))
+
+    monkeypatch.setattr("llm.claude_client.Anthropic", FakeAnthropic)
+
+    call_llm(
+        agent_name="pm1_thesis",
+        system_prompt="system",
+        user_prompt="user",
+        response_schema={"type": "object", "required": ["response"]},
+        settings=_settings(db_url),
+    )
+
+    with create_engine(db_url, future=True).connect() as connection:
+        total = connection.execute(text("SELECT SUM(cost_usd) FROM llm_calls WHERE provider = 'anthropic'")).scalar()
+    assert total == pytest.approx(3.0)

@@ -36,6 +36,7 @@ class ClaudeClient:
         """Store settings used for spend checks and request construction."""
 
         self.settings = settings
+        self.last_cost_usd = 0.0
 
     def complete(
         self,
@@ -61,6 +62,7 @@ class ClaudeClient:
             messages=[{"role": "user", "content": prompt}],
         )
 
+        self.last_cost_usd = self._estimate_cost(response)
         text_output = self._extract_text(response)
         try:
             parsed_output: dict[str, Any] | str = json.loads(text_output)
@@ -81,7 +83,7 @@ class ClaudeClient:
                 prompt=prompt,
                 response=parsed_output,
                 confidence=confidence,
-                cost_usd=self._estimate_cost(response),
+                cost_usd=self.last_cost_usd,
                 input_tokens=self._extract_token_count(response, "input_tokens"),
                 output_tokens=self._extract_token_count(response, "output_tokens"),
             )
@@ -114,7 +116,7 @@ class ClaudeClient:
     def _engine_for_settings(self):
         """Build a cached SQLAlchemy engine for the configured database URL."""
 
-        database_url = getattr(self.settings, "AIDER_DATABASE_URL")
+        database_url = getattr(self.settings, "AIDER_DATABASE_URL", None) or getattr(self.settings, "DATABASE_URL")
         return create_engine(database_url, future=True)
 
     def _compose_prompt(
