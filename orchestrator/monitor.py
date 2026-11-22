@@ -111,7 +111,8 @@ class OrchestratorMonitor:
 
             # Hard stops and exhausted retries: mark failed, alert humans, and clear the entries
             if failures >= self.max_attempts or any(_is_terminal(e.reason) for e in dlq_entries):
-                self._mark_run_failed(run_id, dlq_entries)
+                if not self._mark_run_failed(run_id, dlq_entries):
+                    continue
                 self._replays.pop(run_id, None)
                 for entry in dlq_entries:
                     try:
@@ -125,12 +126,13 @@ class OrchestratorMonitor:
             next_retry_ms = last_ts + int(delay * 1000)
             if now_ms >= next_retry_ms:
                 self.logger.info("orchestrator_requeue_run", run_id=run_id, failures=failures)
-                self._replays[run_id] = self._replays.get(run_id, 0) + 1
                 # republish original payloads and remove DLQ entries
+                replayed = False
                 for entry in dlq_entries:
                     if entry.original_stream and entry.original_payload:
                         try:
                             self.bus.publish(entry.original_stream, _with_incremented_retry(entry.original_payload))
+                            replayed = True
                             # delete the specific DLQ stream entry
                             try:
                                 self.redis.xdel("dlq:failed", entry.id)
@@ -143,6 +145,8 @@ class OrchestratorMonitor:
                                 pass
                         except Exception as exc:
                             self.logger.error("orchestrator_republish_failed", run_id=run_id, entry_id=entry.id, error=str(exc))
+                if replayed:
+                    self._replays[run_id] = self._replays.get(run_id, 0) + 1
 
     def _attempts(self, run_id: str, dlq_entries: List[DLQEntry]) -> int:
         """Count failed attempts for a run, including earlier replays whose DLQ entries were deleted."""
@@ -192,8 +196,12 @@ class OrchestratorMonitor:
             grouped.setdefault(key, []).append(e)
         return grouped
 
-    def _mark_run_failed(self, run_id: Optional[str], dlq_entries: List[DLQEntry]) -> None:
-        """Mark a pipeline run as failed (if DB table exists) and publish an alert."""
+    def _mark_run_failed(self, run_id: Optional[str], dlq_entries: List[DLQEntry]) -> bool:
+        """Mark a pipeline run as failed (if DB table exists) and publish an alert.
+
+        Returns False when the status update failed, so callers keep the DLQ
+        entries and retry on the next poll.
+        """
 
         self.logger.warning("orchestrator_marking_failed", run_id=run_id, failures=len(dlq_entries))
 
@@ -203,13 +211,10 @@ class OrchestratorMonitor:
                 inspector = inspect(self.db_engine)
                 if inspector.has_table("pipeline_runs"):
                     with self.db_engine.begin() as conn:
-                        try:
-                            conn.execute(text("UPDATE pipeline_runs SET status = :status, completed_at = :completed_at WHERE run_id = :run_id"), {"status": "failed", "completed_at": datetime.now(timezone.utc), "run_id": run_id})
-                        except Exception:
-                            # best-effort — ignore schema mismatches
-                            pass
-            except Exception:
-                pass
+                        conn.execute(text("UPDATE pipeline_runs SET status = :status, completed_at = :completed_at WHERE run_id = :run_id"), {"status": "failed", "completed_at": datetime.now(timezone.utc), "run_id": run_id})
+            except Exception as exc:
+                self.logger.error("orchestrator_mark_failed_db_error", run_id=run_id, error=str(exc))
+                return False
 
         # Publish a human alert to Redis stream `alerts:human`
         alert = {
@@ -232,6 +237,7 @@ class OrchestratorMonitor:
             self._send_email(alert)
         except Exception:
             self.logger.exception("email_alert_failed", run_id=run_id)
+        return True
 
     def _record_dlq_retry(self, dlq_entry_id: str) -> None:
         """Insert a retry record into `dlq_retries` when the table exists.

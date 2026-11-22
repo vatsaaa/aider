@@ -169,3 +169,42 @@ def test_repeated_failures_escalate_after_max_attempts():
     assert len(fake.published["stage:av1:output"]) == 2
     assert envelope["metadata"]["retry_count"] == 2
     assert "alerts:human" in fake.published
+
+
+def test_db_failure_keeps_dlq_entries_for_retry():
+    fake = FakeRedis()
+    payload = {"reason": "max_revisions_exceeded", "run_id": "run-5", "original_stream": "critic:verdict:input", "original_payload": {"issues": []}}
+    fake._streams["dlq:failed"] = [(b"1000-0", {b"data": json.dumps(payload).encode()})]
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE pipeline_runs (run_id TEXT PRIMARY KEY)"))
+
+    monitor = OrchestratorMonitor(poll_interval=1, base_delay_seconds=1, max_attempts=3, redis_client=fake, db_engine=engine)
+    monitor._send_slack = lambda alert: None
+    monitor._send_email = lambda alert: None
+    monitor._poll_once()
+
+    assert len(fake._streams["dlq:failed"]) == 1
+    assert "critic:verdict:input" not in fake.published
+
+
+def test_failed_republish_does_not_spend_retry_budget():
+    fake = FakeRedis()
+    engine = create_engine("sqlite:///:memory:")
+    _create_db(engine)
+    monitor = OrchestratorMonitor(poll_interval=1, base_delay_seconds=0, max_attempts=2, redis_client=fake, db_engine=engine)
+    monitor._send_slack = lambda alert: None
+    monitor._send_email = lambda alert: None
+
+    def _reject(stream, payload):
+        raise ConnectionError("redis down")
+
+    monitor.bus.publish = _reject
+    payload = {"reason": "transient", "run_id": "run-6", "original_stream": "stage:av1:output", "original_payload": {"metadata": {"retry_count": 0}}}
+    fake._streams["dlq:failed"] = [(b"1000-0", {b"data": json.dumps(payload).encode()})]
+    for _ in range(3):
+        monitor._poll_once()
+
+    assert monitor._replays.get("run-6", 0) == 0
+    assert len(fake._streams["dlq:failed"]) == 1
