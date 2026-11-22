@@ -255,6 +255,29 @@ def _debt_at(company_facts: Dict[str, Any], fy_end: str) -> tuple[Optional[float
     return None, current
 
 
+CURRENT_CASH_TAGS = ("CashAndCashEquivalentsAtCarryingValue",)
+CASH_AND_RESTRICTED_CASH_TAGS = ("CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",)
+NONCURRENT_RESTRICTED_CASH_TAGS = ("RestrictedCashAndCashEquivalentsNoncurrent", "RestrictedCashNoncurrent")
+
+
+def _current_cash_at(company_facts: Dict[str, Any], fy_end: str) -> Optional[float]:
+    """Return the cash balance held within current assets at `fy_end`.
+
+    The cash-flow-statement total (`CashCashEquivalentsRestrictedCash...`) can
+    include noncurrent restricted cash, which is not part of current assets, so
+    that portion is removed when the plain current cash tag is not reported.
+    """
+
+    current = _latest(company_facts, CURRENT_CASH_TAGS, duration=False, as_of=fy_end)
+    if current is not None:
+        return current
+    total = _latest(company_facts, CASH_AND_RESTRICTED_CASH_TAGS, duration=False, as_of=fy_end)
+    if total is None:
+        return None
+    noncurrent_restricted = _latest(company_facts, NONCURRENT_RESTRICTED_CASH_TAGS, duration=False, as_of=fy_end)
+    return total - (noncurrent_restricted or 0.0)
+
+
 def _revenue_share(amount: Optional[float], revenue: float) -> Optional[float]:
     """Express `amount` relative to revenue in the form AV2's `_percent_of_revenue` expects.
 
@@ -329,7 +352,8 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
 
     debt, current_debt = _debt_at(company_facts, fy_end)
     # AV2 models cash and debt separately, so working capital excludes them
-    operating_current_assets = current_assets - (cash or 0.0) if current_assets is not None else None
+    current_cash = _current_cash_at(company_facts, fy_end)
+    operating_current_assets = current_assets - (current_cash or 0.0) if current_assets is not None else None
     operating_current_liabilities = current_liabilities - (current_debt or 0.0) if current_liabilities is not None else None
 
     da_pct = _ratio(da, revenue)

@@ -195,6 +195,21 @@ def test_short_term_borrowings_total_not_combined_with_its_components() -> None:
     assert with_paper["current_liabilities_pct_revenue"] == without_paper["current_liabilities_pct_revenue"]
 
 
+def test_noncurrent_restricted_cash_not_removed_from_current_assets() -> None:
+    """Only cash held in current assets is excluded from working capital."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    del gaap["CashAndCashEquivalentsAtCarryingValue"]
+    gaap["AssetsCurrent"] = _usd(_instant(150e9, 2024))
+    gaap["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"] = _usd(_instant(40e9, 2024))
+    gaap["RestrictedCashNoncurrent"] = _usd(_instant(5e9, 2024))
+
+    fin = edgar.extract_financials(facts)["financials"]
+    assert fin["cash"] == 40e9
+    assert fin["current_assets_pct_revenue"] == pytest.approx((150e9 - 35e9) / 391e9)
+
+
 def test_bank_revenue_tag_is_recognised() -> None:
     """Banks report revenue as `RevenuesNetOfInterestExpense`."""
 
