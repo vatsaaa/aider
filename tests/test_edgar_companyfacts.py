@@ -135,6 +135,9 @@ def test_extract_financials_uses_latest_annual_values() -> None:
     assert fin["shares_outstanding"] == 15e9
     assert fin["tax_rate"] == pytest.approx(25 / 120)
     assert fin["capex_pct_revenue"] == pytest.approx(9e9 / 391e9)
+    # working capital excludes cash and current debt, which AV2 models separately
+    assert fin["current_assets_pct_revenue"] == pytest.approx((150e9 - 30e9) / 391e9)
+    assert fin["current_liabilities_pct_revenue"] == pytest.approx((175e9 - 10e9) / 391e9)
     assert fin["dividend_payout_pct"] == pytest.approx(15 / 95)
     # EBIT implied by AV2's cost structure matches reported operating income
     implied_ebit = 391e9 * (1 - fin["cogs_pct_revenue"] - fin["opex_pct_revenue"] - fin["da_pct_revenue"])
@@ -173,6 +176,59 @@ def test_total_debt_does_not_double_count_overlapping_tags() -> None:
     gaap["CommercialPaper"] = _usd(_instant(5e9, 2024))
 
     assert edgar.extract_financials(facts)["financials"]["debt"] == 100e9
+
+
+def test_bank_revenue_tag_is_recognised() -> None:
+    """Banks report revenue as `RevenuesNetOfInterestExpense`."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    del gaap["RevenueFromContractWithCustomerExcludingAssessedTax"]
+    gaap["Revenues"] = _usd(_duration(150e9, 2019))
+    gaap["RevenuesNetOfInterestExpense"] = _usd(_duration(180e9, 2024))
+
+    fin = edgar.extract_financials(facts)["financials"]
+    assert fin["historical_revenue"] == 180e9
+    assert fin["fiscal_year_end"] == "2024-09-30"
+
+
+def test_stale_revenue_is_rejected() -> None:
+    """Revenue only available for years before the latest balance sheet raises instead of modelling old data."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    del gaap["RevenueFromContractWithCustomerExcludingAssessedTax"]
+    gaap["Revenues"] = _usd(_duration(150e9, 2019))
+    gaap["Assets"]["units"]["USD"].append(_instant(100e9, 2019))
+
+    with pytest.raises(edgar.EdgarError, match="stale"):
+        edgar.extract_financials(facts)
+
+
+def test_ratios_above_one_are_sent_as_amounts() -> None:
+    """Balance-sheet items larger than revenue are passed as dollar amounts so AV2 does not scale them twice."""
+
+    facts = sample_company_facts()
+    facts["facts"]["us-gaap"]["AssetsCurrent"] = _usd(_instant(500e9, 2024))
+
+    package = edgar.extract_financials(facts)
+    assert package["financials"]["current_assets_pct_revenue"] == 470e9
+
+    model = ThreeStatementModel({**package, "market": {"beta": 1.0}})
+    assert model.inputs.current_assets_pct == pytest.approx(470e9 / 391e9)
+
+
+def test_debt_missing_without_long_term_tag() -> None:
+    """Current borrowings alone are not reported as total debt."""
+
+    facts = sample_company_facts()
+    del facts["facts"]["us-gaap"]["LongTermDebtNoncurrent"]
+
+    result = edgar.extract_financials(facts)
+    assert "debt" not in result["financials"]
+    assert "debt" in result["missing_fields"]
+    # the current portion is still excluded from operating current liabilities
+    assert result["financials"]["current_liabilities_pct_revenue"] == pytest.approx((175e9 - 10e9) / 391e9)
 
 
 def test_extracted_financials_produce_balanced_av2_model() -> None:

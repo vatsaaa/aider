@@ -192,7 +192,7 @@ def _ratio(numerator: Optional[float], denominator: Optional[float]) -> Optional
     return numerator / denominator
 
 
-REVENUE_TAGS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet")
+REVENUE_TAGS = ("Revenues", "RevenuesNetOfInterestExpense", "RevenueFromContractWithCustomerExcludingAssessedTax", "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet")
 COST_OF_REVENUE_TAGS = ("CostOfRevenue", "CostOfGoodsAndServicesSold", "CostOfGoodsSold", "CostOfServices")
 OPERATING_INCOME_TAGS = ("OperatingIncomeLoss",)
 NET_INCOME_TAGS = ("NetIncomeLoss", "ProfitLoss")
@@ -218,31 +218,51 @@ TOTAL_LONG_TERM_DEBT_TAGS = ("LongTermDebt", "LongTermDebtAndCapitalLeaseObligat
 SHORT_TERM_BORROWING_TAGS = (("CommercialPaper",), ("ShortTermBorrowings",), ("OtherShortTermBorrowings",))
 
 
-def _total_debt(company_facts: Dict[str, Any], fy_end: str) -> Optional[float]:
-    """Return total borrowings at `fy_end`, avoiding double counting across overlapping tags.
+def _debt_at(company_facts: Dict[str, Any], fy_end: str) -> tuple[Optional[float], Optional[float]]:
+    """Return `(total_debt, current_debt)` at `fy_end`, avoiding double counting across overlapping tags.
 
     `DebtCurrent` already includes short-term borrowings, and `LongTermDebt`
     already includes current maturities, so those totals are only combined
-    with components they do not contain.
+    with components they do not contain. When no long-term debt tag is
+    reported (e.g. the filer uses a custom tag), total debt is `None` rather
+    than understated as current borrowings only.
     """
 
     def value(tags: Iterable[str]) -> Optional[float]:
         return _latest(company_facts, tags, duration=False, as_of=fy_end)
 
-    short_term_parts = [value(tags) for tags in SHORT_TERM_BORROWING_TAGS]
-    short_term = sum(v for v in short_term_parts if v is not None) if any(v is not None for v in short_term_parts) else None
-    noncurrent = value(LONG_TERM_DEBT_NONCURRENT_TAGS)
+    short_term_parts = [v for v in (value(tags) for tags in SHORT_TERM_BORROWING_TAGS) if v is not None]
+    short_term = sum(short_term_parts) if short_term_parts else None
     current_maturities = value(CURRENT_MATURITIES_TAGS)
     total_current = value(TOTAL_CURRENT_DEBT_TAGS)
-    total_long_term = value(TOTAL_LONG_TERM_DEBT_TAGS)
+    if total_current is not None:
+        current: Optional[float] = total_current
+    elif current_maturities is not None or short_term is not None:
+        current = (current_maturities or 0.0) + (short_term or 0.0)
+    else:
+        current = None
 
+    noncurrent = value(LONG_TERM_DEBT_NONCURRENT_TAGS)
     if noncurrent is not None:
-        current = total_current if total_current is not None else (current_maturities or 0.0) + (short_term or 0.0)
-        return noncurrent + current
+        return noncurrent + (current or 0.0), current
+    total_long_term = value(TOTAL_LONG_TERM_DEBT_TAGS)
     if total_long_term is not None:
-        return total_long_term + (short_term or 0.0)
-    parts = [v for v in (total_current, current_maturities if total_current is None else None, short_term if total_current is None else None) if v is not None]
-    return sum(parts) if parts else None
+        return total_long_term + (short_term or 0.0), current
+    return None, current
+
+
+def _revenue_share(amount: Optional[float], revenue: float) -> Optional[float]:
+    """Express `amount` relative to revenue in the form AV2's `_percent_of_revenue` expects.
+
+    AV2 treats values with magnitude <= 1 as ratios and larger values as dollar
+    amounts it divides by revenue, so a ratio above 100% (e.g. current assets
+    exceeding revenue) is passed as the dollar amount to avoid being scaled twice.
+    """
+
+    if amount is None or revenue <= 0:
+        return None
+    share = amount / revenue
+    return share if abs(share) <= 1.0 else amount
 
 
 def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,6 +279,12 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
     revenue_history = _annual_entries(company_facts, REVENUE_TAGS, "USD", duration=True)
     revenue = float(revenue_history[0]["val"]) if revenue_history else None
     fy_end = revenue_history[0]["end"] if revenue_history else None
+    latest_balance_sheet = _annual_entries(company_facts, ASSETS_TAGS, "USD", duration=False)
+    if fy_end and latest_balance_sheet and _days_between(fy_end, latest_balance_sheet[0]["end"]) > 31:
+        raise EdgarError(
+            f"SEC companyfacts revenue is stale: latest revenue fact ends {fy_end} but the latest annual balance sheet is "
+            f"{latest_balance_sheet[0]['end']} (revenue likely reported under an unmapped tag)"
+        )
     assets = _latest(company_facts, ASSETS_TAGS, duration=False, as_of=fy_end) if fy_end else None
     equity = _latest(company_facts, EQUITY_TAGS, duration=False, as_of=fy_end) if fy_end else None
     missing = [name for name, value in (("revenue", revenue), ("total_assets", assets), ("total_equity", equity)) if value is None]
@@ -291,10 +317,12 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
     # cover-page share count is dated near the filing date, not the fiscal year end
     shares = _latest(company_facts, ("EntityCommonStockSharesOutstanding",), duration=False, unit="shares", taxonomy="dei")
 
-    debt = _total_debt(company_facts, fy_end)
+    debt, current_debt = _debt_at(company_facts, fy_end)
+    # AV2 models cash and debt separately, so working capital excludes them
+    operating_current_assets = current_assets - (cash or 0.0) if current_assets is not None else None
+    operating_current_liabilities = current_liabilities - (current_debt or 0.0) if current_liabilities is not None else None
 
     da_pct = _ratio(da, revenue)
-    cogs_pct = _ratio(cost_of_revenue, revenue)
     opex_pct: Optional[float] = None
     if operating_income is not None and cost_of_revenue is not None:
         # AV2 computes EBIT = revenue - COGS - opex - D&A, so back out opex to match reported operating income
@@ -308,17 +336,17 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
         "historical_revenue": revenue,
         "revenue_history": {entry["end"]: float(entry["val"]) for entry in revenue_history[:5]},
         "fiscal_year_end": fy_end,
-        "cogs_pct_revenue": cogs_pct,
+        "cogs_pct_revenue": _revenue_share(cost_of_revenue, revenue),
         "opex_pct_revenue": opex_pct,
-        "da_pct_revenue": da_pct,
+        "da_pct_revenue": _revenue_share(da, revenue),
         "tax_rate": tax_rate,
         "interest_rate": _ratio(interest, debt),
         "debt": debt,
         "cash": cash,
-        "current_assets_pct_revenue": _ratio(current_assets, revenue),
-        "current_liabilities_pct_revenue": _ratio(current_liabilities, revenue),
-        "net_ppe_pct_revenue": _ratio(ppe, revenue),
-        "capex_pct_revenue": _ratio(abs(capex) if capex is not None else None, revenue),
+        "current_assets_pct_revenue": _revenue_share(operating_current_assets, revenue),
+        "current_liabilities_pct_revenue": _revenue_share(operating_current_liabilities, revenue),
+        "net_ppe_pct_revenue": _revenue_share(ppe, revenue),
+        "capex_pct_revenue": _revenue_share(abs(capex) if capex is not None else None, revenue),
         "dividend_payout_pct": _ratio(abs(dividends) if dividends is not None else None, net_income),
         "operating_income": operating_income,
         "net_income": net_income,
