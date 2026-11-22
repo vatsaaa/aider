@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import smtplib
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -214,7 +215,7 @@ class CoverageMonitor:
         self.start()
         try:
             while True:
-                pass
+                time.sleep(1)
         except KeyboardInterrupt:
             self.scheduler.shutdown(wait=False)
 
