@@ -11,3 +11,9 @@ build
 *.pyo
 *.pyd
 .DS_Store
+# test code and fixtures are never shipped in the production image
+tests
+conftest.py
+pytest.ini
+.coverage
+htmlcov
