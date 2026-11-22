@@ -187,9 +187,23 @@ def test_bank_revenue_tag_is_recognised() -> None:
     gaap["Revenues"] = _usd(_duration(150e9, 2019))
     gaap["RevenuesNetOfInterestExpense"] = _usd(_duration(180e9, 2024))
 
-    fin = edgar.extract_financials(facts)["financials"]
+    package = edgar.extract_financials(facts)
+    fin = package["financials"]
     assert fin["historical_revenue"] == 180e9
     assert fin["fiscal_year_end"] == "2024-09-30"
+    assert fin["revenue_net_of_interest"] is True
+
+    # interest is already netted out of bank revenue, so AV2 does not deduct it again
+    bank = ThreeStatementModel({**package, "market": {"beta": 1.0}})
+    assert (bank.build_income_statement()["InterestExpense"] == 0).all()
+    non_bank = ThreeStatementModel({**package, "financials": {**fin, "revenue_net_of_interest": False}, "market": {"beta": 1.0}})
+    assert (non_bank.build_income_statement()["InterestExpense"] > 0).all()
+
+
+def test_non_bank_revenue_not_flagged_net_of_interest() -> None:
+    """Ordinary revenue tags leave AV2's interest expense in place."""
+
+    assert edgar.extract_financials(sample_company_facts())["financials"]["revenue_net_of_interest"] is False
 
 
 def test_stale_revenue_is_rejected() -> None:

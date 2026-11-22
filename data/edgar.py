@@ -317,6 +317,12 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
     # cover-page share count is dated near the filing date, not the fiscal year end
     shares = _latest(company_facts, ("EntityCommonStockSharesOutstanding",), duration=False, unit="shares", taxonomy="dei")
 
+    # bank revenue is reported after interest expense; AV2 must not deduct interest a second time
+    revenue_net_of_interest = any(
+        entry["end"] == fy_end and float(entry["val"]) == revenue
+        for entry in _annual_entries(company_facts, ("RevenuesNetOfInterestExpense",), "USD", duration=True)
+    )
+
     debt, current_debt = _debt_at(company_facts, fy_end)
     # AV2 models cash and debt separately, so working capital excludes them
     operating_current_assets = current_assets - (cash or 0.0) if current_assets is not None else None
@@ -336,6 +342,7 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
         "historical_revenue": revenue,
         "revenue_history": {entry["end"]: float(entry["val"]) for entry in revenue_history[:5]},
         "fiscal_year_end": fy_end,
+        "revenue_net_of_interest": revenue_net_of_interest,
         "cogs_pct_revenue": _revenue_share(cost_of_revenue, revenue),
         "opex_pct_revenue": opex_pct,
         "da_pct_revenue": _revenue_share(da, revenue),
