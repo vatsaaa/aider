@@ -210,6 +210,20 @@ def test_noncurrent_restricted_cash_not_removed_from_current_assets() -> None:
     assert fin["current_assets_pct_revenue"] == pytest.approx((150e9 - 35e9) / 391e9)
 
 
+def test_working_capital_excludes_the_same_cash_passed_to_av2() -> None:
+    """A newer combined cash fact supplies `cash`; that same balance (incl. current restricted cash) leaves working capital."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    gaap["AssetsCurrent"] = _usd(_instant(150e9, 2024))
+    combined = {**_instant(33e9, 2024), "filed": "2025-02-01"}
+    gaap["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"] = _usd(combined)
+
+    fin = edgar.extract_financials(facts)["financials"]
+    assert fin["cash"] == 33e9
+    assert fin["current_assets_pct_revenue"] == pytest.approx((150e9 - 33e9) / 391e9)
+
+
 def test_bank_revenue_tag_is_recognised() -> None:
     """Banks report revenue as `RevenuesNetOfInterestExpense`."""
 

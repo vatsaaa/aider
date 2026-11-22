@@ -255,27 +255,25 @@ def _debt_at(company_facts: Dict[str, Any], fy_end: str) -> tuple[Optional[float
     return None, current
 
 
-CURRENT_CASH_TAGS = ("CashAndCashEquivalentsAtCarryingValue",)
 CASH_AND_RESTRICTED_CASH_TAGS = ("CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",)
 NONCURRENT_RESTRICTED_CASH_TAGS = ("RestrictedCashAndCashEquivalentsNoncurrent", "RestrictedCashNoncurrent")
 
 
-def _current_cash_at(company_facts: Dict[str, Any], fy_end: str) -> Optional[float]:
-    """Return the cash balance held within current assets at `fy_end`.
+def _current_cash(company_facts: Dict[str, Any], fy_end: str, cash: Optional[float], cash_tag: Optional[str]) -> Optional[float]:
+    """Return the part of the reported `cash` balance that sits within current assets.
 
-    The cash-flow-statement total (`CashCashEquivalentsRestrictedCash...`) can
-    include noncurrent restricted cash, which is not part of current assets, so
-    that portion is removed when the plain current cash tag is not reported.
+    Working capital must exclude exactly the cash AV2 models separately. When
+    `cash` comes from the cash-flow-statement total (which can include
+    noncurrent restricted cash, outside current assets), that noncurrent
+    portion is removed.
     """
 
-    current = _latest(company_facts, CURRENT_CASH_TAGS, duration=False, as_of=fy_end)
-    if current is not None:
-        return current
-    total = _latest(company_facts, CASH_AND_RESTRICTED_CASH_TAGS, duration=False, as_of=fy_end)
-    if total is None:
+    if cash is None:
         return None
-    noncurrent_restricted = _latest(company_facts, NONCURRENT_RESTRICTED_CASH_TAGS, duration=False, as_of=fy_end)
-    return total - (noncurrent_restricted or 0.0)
+    if cash_tag in CASH_AND_RESTRICTED_CASH_TAGS:
+        noncurrent_restricted = _latest(company_facts, NONCURRENT_RESTRICTED_CASH_TAGS, duration=False, as_of=fy_end)
+        return cash - (noncurrent_restricted or 0.0)
+    return cash
 
 
 def _revenue_share(amount: Optional[float], revenue: float) -> Optional[float]:
@@ -337,7 +335,8 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
     ocf = _latest(company_facts, OCF_TAGS, duration=True, as_of=fy_end)
     capex = _latest(company_facts, CAPEX_TAGS, duration=True, as_of=fy_end)
     dividends = _latest(company_facts, DIVIDEND_TAGS, duration=True, as_of=fy_end)
-    cash = _latest(company_facts, CASH_TAGS, duration=False, as_of=fy_end)
+    cash_entry = next((entry for entry in _annual_entries(company_facts, CASH_TAGS, "USD", duration=False) if entry["end"] == fy_end), None)
+    cash = float(cash_entry["val"]) if cash_entry else None
     current_assets = _latest(company_facts, CURRENT_ASSETS_TAGS, duration=False, as_of=fy_end)
     current_liabilities = _latest(company_facts, CURRENT_LIABILITIES_TAGS, duration=False, as_of=fy_end)
     ppe = _latest(company_facts, PPE_TAGS, duration=False, as_of=fy_end)
@@ -349,7 +348,7 @@ def extract_financials(company_facts: Dict[str, Any]) -> Dict[str, Any]:
 
     debt, current_debt = _debt_at(company_facts, fy_end)
     # AV2 models cash and debt separately, so working capital excludes them
-    current_cash = _current_cash_at(company_facts, fy_end)
+    current_cash = _current_cash(company_facts, fy_end, cash, cash_entry["tag"] if cash_entry else None)
     operating_current_assets = current_assets - (current_cash or 0.0) if current_assets is not None else None
     operating_current_liabilities = current_liabilities - (current_debt or 0.0) if current_liabilities is not None else None
 
