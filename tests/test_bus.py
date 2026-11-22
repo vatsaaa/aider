@@ -158,3 +158,21 @@ def test_cache_round_trip(monkeypatch, tmp_path):
 
     assert cached is not None
     assert json.loads(cached) == {"value": 1}
+
+
+def test_consume_treats_socket_timeout_as_idle_read():
+    """A redis socket timeout during a blocking XREADGROUP returns no messages instead of crashing the agent loop."""
+
+    import redis as redis_mod
+
+    from core.bus import RedisStreamsBus
+
+    class TimingOutClient:
+        def xgroup_create(self, *args, **kwargs):
+            return True
+
+        def xreadgroup(self, *args, **kwargs):
+            raise redis_mod.exceptions.TimeoutError("Timeout reading from socket")
+
+    bus = RedisStreamsBus(TimingOutClient(), db_url="sqlite:///:memory:")
+    assert bus.consume("stage:rs1:output", "g", "c", block_ms=5000) == []

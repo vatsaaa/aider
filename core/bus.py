@@ -136,6 +136,9 @@ class RedisStreamsBus(Bus):
         try:
             self._ensure_group(stream, group)
             entries = self._client.xreadgroup(group, consumer, {stream: ">"}, count=count, block=block_ms)
+        except redis.exceptions.TimeoutError:
+            # client socket timeout shorter than the block window: treat as an idle read
+            return []
         except redis.exceptions.ConnectionError as exc:
             raise BusConnectionError("Redis unreachable") from exc
 

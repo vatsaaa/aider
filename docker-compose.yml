@@ -44,107 +44,167 @@ services:
   scanner:
     build: .
     env_file: .env
+    command: python -m triggers.scanner
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   rs1:
     build: .
     env_file: .env
+    command: python -m core.runner rs1
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   rs2:
     build: .
     env_file: .env
+    command: python -m core.runner rs2
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   rs3:
     build: .
     env_file: .env
+    command: python -m core.runner rs3
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   av1:
     build: .
     env_file: .env
+    command: python -m core.runner av1
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   av2:
     build: .
     env_file: .env
+    command: python -m core.runner av2
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   av3:
     build: .
     env_file: .env
+    command: python -m core.runner av3
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   pm1:
     build: .
     env_file: .env
+    command: python -m core.runner pm1
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   quant_critic:
     build: .
     env_file: .env
+    command: python -m core.runner quant_critic
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   logic_critic:
     build: .
     env_file: .env
+    command: python -m core.runner logic_critic
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   data_critic:
     build: .
     env_file: .env
+    command: python -m core.runner data_critic
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   arbiter:
     build: .
     env_file: .env
+    command: python -m core.runner arbiter
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   pm2:
     build: .
     env_file: .env
+    command: python -m core.runner pm2
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   pm3:
     build: .
     env_file: .env
+    command: python -m core.runner pm3
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   monitor:
     build: .
     env_file: .env
+    command: python -m core.runner monitor
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   orchestrator-monitor:
     build: .
