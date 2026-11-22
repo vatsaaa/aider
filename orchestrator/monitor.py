@@ -31,6 +31,38 @@ class DLQEntry:
     original_stream: Optional[str]
     original_payload: Dict[str, Any]
     ts_ms: int
+    reason: Optional[str] = None
+
+
+# Hard-stop failures that must never be replayed (see CLAUDE.md constraints).
+TERMINAL_REASONS = {"model_balance_failure", "max_revisions_exceeded"}
+TERMINAL_REASON_PREFIXES = ("mnpi_detected",)
+
+
+def _is_terminal(reason: Optional[str]) -> bool:
+    """Return True when a DLQ reason denotes a failure that retrying cannot fix."""
+
+    if not reason:
+        return False
+    return reason in TERMINAL_REASONS or reason.startswith(TERMINAL_REASON_PREFIXES)
+
+
+def _retry_count(payload: Dict[str, Any]) -> int:
+    """Read `metadata.retry_count` from a message envelope, defaulting to 0."""
+
+    metadata = payload.get("metadata") if isinstance(payload, dict) else None
+    try:
+        return int(metadata.get("retry_count", 0)) if isinstance(metadata, dict) else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _with_incremented_retry(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of an envelope payload with `metadata.retry_count` bumped by one."""
+
+    if not isinstance(payload.get("metadata"), dict):
+        return payload
+    return {**payload, "metadata": {**payload["metadata"], "retry_count": _retry_count(payload) + 1}}
 
 
 class OrchestratorMonitor:
@@ -49,6 +81,7 @@ class OrchestratorMonitor:
         self.poll_interval = poll_interval
         self.base_delay_seconds = base_delay_seconds
         self.max_attempts = max_attempts
+        self._replays: Dict[str, int] = {}
 
         # Allow injection for tests; fall back to configured endpoints
         self.redis = redis_client or redis.Redis.from_url(settings.REDIS_URL)
@@ -73,12 +106,18 @@ class OrchestratorMonitor:
 
         now_ms = int(time.time() * 1000)
         for run_id, dlq_entries in grouped.items():
-            failures = len(dlq_entries)
+            failures = self._attempts(run_id, dlq_entries)
             last_ts = max(e.ts_ms for e in dlq_entries)
 
-            # If we've exceeded max attempts, mark failed and alert humans
-            if failures >= self.max_attempts:
+            # Hard stops and exhausted retries: mark failed, alert humans, and clear the entries
+            if failures >= self.max_attempts or any(_is_terminal(e.reason) for e in dlq_entries):
                 self._mark_run_failed(run_id, dlq_entries)
+                self._replays.pop(run_id, None)
+                for entry in dlq_entries:
+                    try:
+                        self.redis.xdel("dlq:failed", entry.id)
+                    except Exception:
+                        pass
                 continue
 
             # compute exponential backoff next retry timestamp in ms
@@ -86,11 +125,12 @@ class OrchestratorMonitor:
             next_retry_ms = last_ts + int(delay * 1000)
             if now_ms >= next_retry_ms:
                 self.logger.info("orchestrator_requeue_run", run_id=run_id, failures=failures)
+                self._replays[run_id] = self._replays.get(run_id, 0) + 1
                 # republish original payloads and remove DLQ entries
                 for entry in dlq_entries:
                     if entry.original_stream and entry.original_payload:
                         try:
-                            self.bus.publish(entry.original_stream, entry.original_payload)
+                            self.bus.publish(entry.original_stream, _with_incremented_retry(entry.original_payload))
                             # delete the specific DLQ stream entry
                             try:
                                 self.redis.xdel("dlq:failed", entry.id)
@@ -103,6 +143,12 @@ class OrchestratorMonitor:
                                 pass
                         except Exception as exc:
                             self.logger.error("orchestrator_republish_failed", run_id=run_id, entry_id=entry.id, error=str(exc))
+
+    def _attempts(self, run_id: str, dlq_entries: List[DLQEntry]) -> int:
+        """Count failed attempts for a run, including earlier replays whose DLQ entries were deleted."""
+
+        from_envelopes = max((_retry_count(e.original_payload) for e in dlq_entries), default=0) + 1
+        return max(len(dlq_entries) + self._replays.get(run_id, 0), from_envelopes)
 
     def _read_dlq_stream(self) -> List[DLQEntry]:
         """Read all entries from the `dlq:failed` stream and return decoded list."""
@@ -135,7 +181,7 @@ class OrchestratorMonitor:
             except Exception:
                 ts_ms = int(time.time() * 1000)
 
-            out.append(DLQEntry(id=item_id.decode() if isinstance(item_id, (bytes, bytearray)) else str(item_id), run_id=run_id, original_stream=original_stream, original_payload=original_payload, ts_ms=ts_ms))
+            out.append(DLQEntry(id=item_id.decode() if isinstance(item_id, (bytes, bytearray)) else str(item_id), run_id=run_id, original_stream=original_stream, original_payload=original_payload, ts_ms=ts_ms, reason=payload.get("reason")))
 
         return out
 

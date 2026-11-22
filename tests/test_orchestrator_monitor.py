@@ -124,3 +124,48 @@ def test_mark_failed_and_alerts(monkeypatch):
     assert "alerts:human" in fake.published
     assert called["slack"] is True
     assert called["email"] is True
+
+
+def test_terminal_reason_marks_failed_without_replay():
+    fake = FakeRedis()
+    payload = {"reason": "max_revisions_exceeded", "run_id": "run-3", "original_stream": "critic:verdict:input", "original_payload": {"issues": []}}
+    fake._streams["dlq:failed"] = [(b"1000-0", {b"data": json.dumps(payload).encode()})]
+
+    engine = create_engine("sqlite:///:memory:")
+    _create_db(engine)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO pipeline_runs (run_id, status) VALUES ('run-3', 'started')"))
+
+    monitor = OrchestratorMonitor(poll_interval=1, base_delay_seconds=1, max_attempts=3, redis_client=fake, db_engine=engine)
+    monitor._send_slack = lambda alert: None
+    monitor._send_email = lambda alert: None
+    monitor._poll_once()
+
+    assert "critic:verdict:input" not in fake.published
+    assert "alerts:human" in fake.published
+    assert fake._streams["dlq:failed"] == []
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT status FROM pipeline_runs WHERE run_id = 'run-3'")).scalar() == "failed"
+
+
+def test_repeated_failures_escalate_after_max_attempts():
+    fake = FakeRedis()
+    engine = create_engine("sqlite:///:memory:")
+    _create_db(engine)
+    monitor = OrchestratorMonitor(poll_interval=1, base_delay_seconds=0, max_attempts=3, redis_client=fake, db_engine=engine)
+    monitor._send_slack = lambda alert: None
+    monitor._send_email = lambda alert: None
+
+    envelope = {"ticker": "AAPL", "metadata": {"retry_count": 0}}
+    for _ in range(3):
+        fake._streams["dlq:failed"] = [
+            (b"1000-0", {b"data": json.dumps({"reason": "transient", "run_id": "run-4", "original_stream": "stage:av1:output", "original_payload": envelope}).encode()})
+        ]
+        monitor._poll_once()
+        replayed = fake.published.get("stage:av1:output", [])
+        if replayed:
+            envelope = json.loads(replayed[-1]["data"])
+
+    assert len(fake.published["stage:av1:output"]) == 2
+    assert envelope["metadata"]["retry_count"] == 2
+    assert "alerts:human" in fake.published
