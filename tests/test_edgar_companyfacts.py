@@ -178,6 +178,23 @@ def test_total_debt_does_not_double_count_overlapping_tags() -> None:
     assert edgar.extract_financials(facts)["financials"]["debt"] == 100e9
 
 
+def test_short_term_borrowings_total_not_combined_with_its_components() -> None:
+    """Commercial paper is not added again when `ShortTermBorrowings` (which includes it) is reported."""
+
+    facts = sample_company_facts()
+    gaap = facts["facts"]["us-gaap"]
+    gaap.pop("DebtCurrent", None)
+    del gaap["LongTermDebtNoncurrent"]
+    gaap["LongTermDebt"] = _usd(_instant(95e9, 2024))
+    gaap["ShortTermBorrowings"] = _usd(_instant(8e9, 2024))
+    without_paper = edgar.extract_financials(facts)["financials"]
+    gaap["CommercialPaper"] = _usd(_instant(5e9, 2024))
+    with_paper = edgar.extract_financials(facts)["financials"]
+
+    assert with_paper["debt"] == without_paper["debt"] == 103e9
+    assert with_paper["current_liabilities_pct_revenue"] == without_paper["current_liabilities_pct_revenue"]
+
+
 def test_bank_revenue_tag_is_recognised() -> None:
     """Banks report revenue as `RevenuesNetOfInterestExpense`."""
 

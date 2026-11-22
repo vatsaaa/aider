@@ -215,7 +215,8 @@ LONG_TERM_DEBT_NONCURRENT_TAGS = ("LongTermDebtNoncurrent", "LongTermDebtAndCapi
 CURRENT_MATURITIES_TAGS = ("LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent")
 TOTAL_CURRENT_DEBT_TAGS = ("DebtCurrent",)
 TOTAL_LONG_TERM_DEBT_TAGS = ("LongTermDebt", "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities")
-SHORT_TERM_BORROWING_TAGS = (("CommercialPaper",), ("ShortTermBorrowings",), ("OtherShortTermBorrowings",))
+SHORT_TERM_BORROWINGS_TOTAL_TAGS = ("ShortTermBorrowings",)
+SHORT_TERM_BORROWING_COMPONENT_TAGS = (("CommercialPaper",), ("OtherShortTermBorrowings",))
 
 
 def _debt_at(company_facts: Dict[str, Any], fy_end: str) -> tuple[Optional[float], Optional[float]]:
@@ -231,8 +232,11 @@ def _debt_at(company_facts: Dict[str, Any], fy_end: str) -> tuple[Optional[float
     def value(tags: Iterable[str]) -> Optional[float]:
         return _latest(company_facts, tags, duration=False, as_of=fy_end)
 
-    short_term_parts = [v for v in (value(tags) for tags in SHORT_TERM_BORROWING_TAGS) if v is not None]
-    short_term = sum(short_term_parts) if short_term_parts else None
+    # `ShortTermBorrowings` already includes commercial paper and other short-term borrowings
+    short_term = value(SHORT_TERM_BORROWINGS_TOTAL_TAGS)
+    if short_term is None:
+        short_term_parts = [v for v in (value(tags) for tags in SHORT_TERM_BORROWING_COMPONENT_TAGS) if v is not None]
+        short_term = sum(short_term_parts) if short_term_parts else None
     current_maturities = value(CURRENT_MATURITIES_TAGS)
     total_current = value(TOTAL_CURRENT_DEBT_TAGS)
     if total_current is not None:
