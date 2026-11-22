@@ -73,7 +73,7 @@ def test_republish_and_record_retry():
 
     # assert republished to original stream
     assert "stage:av1:output" in fake.published
-    assert fake.published["stage:av1:output"][0] == {"x": 1}
+    assert json.loads(fake.published["stage:av1:output"][0]["data"]) == {"x": 1}
 
     # assert dlq_retries has a row
     with engine.connect() as conn:

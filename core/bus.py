@@ -335,7 +335,7 @@ class InMemoryBus(Bus):
         return len(self._streams[stream])
 
     def flush_stream(self, stream: str) -> None:
-        if settings.ENV != "development":
+        if RedisStreamsBus._settings().ENV != "development":
             raise RuntimeError("flush_stream is only allowed in development environment")
         self._streams.pop(stream, None)
         self._counters.pop(stream, None)

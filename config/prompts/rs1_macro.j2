@@ -10,7 +10,7 @@ FOMC summary:
 {{ fomc_summary | default("") }}
 
 Sector rotation matrix:
-{% for regime, matrix in sector_rotation_matrix.items() %}
+{% for regime, matrix in (sector_rotation_matrix | default({})).items() %}
 - {{ regime }}
   overweights: {{ matrix.overweights }}
   underweights: {{ matrix.underweights }}

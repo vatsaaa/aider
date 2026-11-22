@@ -114,7 +114,7 @@ class ClaudeClient:
     def _engine_for_settings(self):
         """Build a cached SQLAlchemy engine for the configured database URL."""
 
-        database_url = getattr(self.settings, "AIDER_DATABASE_URL")
+        database_url = getattr(self.settings, "AIDER_DATABASE_URL", None) or getattr(self.settings, "DATABASE_URL")
         return create_engine(database_url, future=True)
 
     def _compose_prompt(

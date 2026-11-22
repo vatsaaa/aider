@@ -138,8 +138,8 @@ def _build_scanner() -> TriggerScanner:
     """Create a scanner wired to the configured Redis and PostgreSQL endpoints."""
 
     redis_client = redis.Redis.from_url(settings.REDIS_URL)
-    db_engine = create_engine(settings.DATABASE_URL)
-    bus = RedisStreamsBus(redis_client, db_url=settings.DATABASE_URL)
+    db_engine = create_engine(settings.AIDER_DATABASE_URL)
+    bus = RedisStreamsBus(redis_client, db_url=settings.AIDER_DATABASE_URL)
     return TriggerScanner(bus=bus, db=db_engine, settings=settings)
 
 

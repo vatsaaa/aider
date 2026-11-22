@@ -39,7 +39,10 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
           ENV: development
           ANTHROPIC_API_KEY: dummy
-          REDIS_URL: sqlite:///noop
+          AIDER_DATABASE_URL: "sqlite:///:memory:"
+          REDIS_URL: redis://localhost:6379
+          FRED_API_KEY: dummy
+          SEC_USER_AGENT: CI Runner ci@example.com
         run: |
           pytest -q tests/unit --maxfail=1
 
@@ -105,9 +108,9 @@ jobs:
                   with psycopg2.connect(dsn) as conn:
                       with conn.cursor() as cur:
                           cur.execute('SELECT 1')
-                redis_client.ping()
-                print('PostgreSQL and Redis are ready')
-                raise SystemExit(0)
+                  redis_client.ping()
+                  print('PostgreSQL and Redis are ready')
+                  raise SystemExit(0)
               except Exception as exc:  # noqa: BLE001
                   last_error = exc
                   time.sleep(2)
@@ -122,5 +125,7 @@ jobs:
           ENV: development
           ANTHROPIC_API_KEY: dummy
           REDIS_URL: redis://localhost:6379
+          FRED_API_KEY: dummy
+          SEC_USER_AGENT: CI Runner ci@example.com
         run: |
           pytest -q tests/integration --maxfail=1

@@ -253,7 +253,8 @@ def _response_confidence(response: Any, response_schema: dict[str, Any] | None) 
 def _engine(settings: Any):
     """Build a SQLAlchemy engine for the configured database URL."""
 
-    return create_engine(getattr(settings, "AIDER_DATABASE_URL"), future=True)
+    database_url = getattr(settings, "AIDER_DATABASE_URL", None) or getattr(settings, "DATABASE_URL")
+    return create_engine(database_url, future=True)
 
 
 def _default_settings() -> Any:

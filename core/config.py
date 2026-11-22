@@ -136,6 +136,12 @@ _REQUIRED_VARS = [
 ]
 
 
+def _database_url() -> Optional[str]:
+    """Return `AIDER_DATABASE_URL`, falling back to the legacy `DATABASE_URL`."""
+
+    return _get_env("AIDER_DATABASE_URL") or _get_env("DATABASE_URL")
+
+
 def _validate_required() -> None:
     """Validate required environment variables are present.
 
@@ -145,7 +151,7 @@ def _validate_required() -> None:
 
     missing: List[str] = []
     for name in _REQUIRED_VARS:
-        val = _get_env(name)
+        val = _database_url() if name == "AIDER_DATABASE_URL" else _get_env(name)
         if val is None or val == "":
             missing.append(name)
     if missing:
@@ -162,7 +168,7 @@ settings = Settings(
     OLLAMA_HOST=_get_env("OLLAMA_HOST", "http://localhost:11434"),
     OLLAMA_MODEL=_get_env("OLLAMA_MODEL", "gemma4:e4b"),
     REDIS_URL=_get_env("REDIS_URL", "redis://localhost:6379"),
-    AIDER_DATABASE_URL=_get_env("AIDER_DATABASE_URL", ""),
+    AIDER_DATABASE_URL=_database_url() or "",
     FRED_API_KEY=_get_env("FRED_API_KEY", ""),
     SEC_USER_AGENT=_get_env("SEC_USER_AGENT", ""),
     GIT_REPO_PATH=_get_env("GIT_REPO_PATH", "./reports_audit"),

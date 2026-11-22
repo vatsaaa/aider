@@ -28,15 +28,7 @@ if root_str not in sys.path:
     sys.path.insert(0, root_str)
 
 
-@pytest.fixture(autouse=True)
-def _default_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Seed the minimum environment required by the runtime modules.
-
-    Individual tests can override these defaults with their own monkeypatch
-    calls when they need a different database URL or runtime mode.
-    """
-
-    defaults = {
+_TEST_ENV_DEFAULTS = {
         "ANTHROPIC_API_KEY": "dummy",
         "AIDER_DATABASE_URL": "sqlite:///:memory:",
         "REDIS_URL": "redis://localhost:6379",
@@ -53,8 +45,23 @@ def _default_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GIT_REPO_PATH": str(ROOT / "reports_audit"),
         "GIT_AUTHOR_NAME": "Digital Analyst",
         "GIT_AUTHOR_EMAIL": "analyst@localhost",
-    }
-    for key, value in defaults.items():
+}
+
+# Test modules import `core.config` at collection time, before any fixture runs,
+# so the required variables must exist in the process environment up front.
+for _key, _value in _TEST_ENV_DEFAULTS.items():
+    os.environ.setdefault(_key, _value)
+
+
+@pytest.fixture(autouse=True)
+def _default_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Seed the minimum environment required by the runtime modules.
+
+    Individual tests can override these defaults with their own monkeypatch
+    calls when they need a different database URL or runtime mode.
+    """
+
+    for key, value in _TEST_ENV_DEFAULTS.items():
         monkeypatch.setenv(key, value)
 
 

@@ -130,7 +130,8 @@ class OrchestratorMonitor:
 
             # Redis stream id is like '1597763333444-0' (ms-seq)
             try:
-                ts_ms = int(str(item_id).split(b"-")[0]) if isinstance(item_id, (bytes, bytearray)) else int(str(item_id).split("-")[0])
+                raw_id = item_id.decode() if isinstance(item_id, (bytes, bytearray)) else str(item_id)
+                ts_ms = int(raw_id.split("-")[0])
             except Exception:
                 ts_ms = int(time.time() * 1000)
 

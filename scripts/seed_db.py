@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     from core.config import settings
 
     coverage_rows = load_coverage_universe()
-    seed_database(settings.DATABASE_URL, coverage_rows)
+    seed_database(settings.AIDER_DATABASE_URL, coverage_rows)
     return 0
 
 
